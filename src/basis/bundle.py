@@ -519,21 +519,6 @@ class Bundle:
                              for j in range(self.nstates)])
                 fileio.print_traj_row(self.traj[i].label, 2, data)
 
-                # temporary writing of integral debugging
-#                filename='/tmp/schuurm/fmspy/theta.'+str(self.traj[i].label)
-#                with open(filename, 'a') as outfile:
-#                    outfile.write('\n'+str(self.time)+'  '+str(self.integrals.theta(self.traj[i])))
-#                filename='/tmp/schuurm/fmspy/hessian.'+str(self.traj[i].label)
-#                print("hesses="+str(self.traj[i].pes_data.diabat_deriv2))
-#                hess=self.traj[i].pes_data.diabat_deriv2[:,:,self.traj[i].state, self.traj[i].state]
-#                dderiv=self.traj[i].pes_data.diabat_deriv2[0,1]
-#                with open(filename, 'a') as outfile:
-#                    outfile.write('{:9.2f}\n'.format(self.time))
-#                    outfile.write(np.array2string(hess,
-#                      formatter={'complex_kind':lambda x: '{: 15.8e}'.format(x)})+'\n')
-#                    outfile.write(np.array2string(dderiv,
-#                      formatter={'complex_kind':lambda x: '{: 15.8e}'.format(x)})+'\n')
-
             # print pes information relevant to the chosen interface
             if glbl.printing['print_es']:
 

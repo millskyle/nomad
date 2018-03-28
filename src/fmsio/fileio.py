@@ -171,20 +171,25 @@ def validate_input():
     except ImportError:
         print('Cannot import integrals: src.integrals.' + 
                                str(glbl.propagate['integrals']))
+        sys.exit('import error: fileio.validate_input()')
 
+#    glbl.pes = __import__('src.interfaces.' +
+#                           glbl.interface['interface'],fromlist=['a'])
     try:
         glbl.pes = __import__('src.interfaces.' + 
-                               glbl.interface['interface'],fromlist=['NA'])
+                               glbl.interface['interface'],fromlist=['a'])
     except ImportError:
         print('Cannot import pes: src.interfaces.'+
                                str(glbl.interface['interface']))
+        sys.exit('import error: fileio.validate_input()')
 
     try:
         glbl.distrib = __import__('src.sampling.'+glbl.sampling['init_sampling'],
-                                 fromlist=['NA'])
+                                 fromlist=['a'])
     except ImportError:
         print('Cannot import sampling: src.sampling.'+
                                str(glbl.sampling['init_sampling']))
+        sys.exit('import error: fileio.validate_input()')
 
     try:
         glbl.spawn = __import__('src.spawn.'+glbl.spawning['spawning'],
@@ -192,6 +197,7 @@ def validate_input():
     except ImportError:
         print('Cannot import spawning: src.spawn.'+
                                str(glbl.spawning['spawning']))
+        sys.exit('import error: fileio.validate_input()')
 
     try:
         glbl.integrator = __import__('src.propagators.'+glbl.propagate['propagator'],
@@ -199,6 +205,7 @@ def validate_input():
     except ImportError:
         print('Cannot import propagator: src.propagators.'+
                                str(glbl.propagate['propagator']))
+        sys.exit('import error: fileio.validate_input()')
 
 
     # if geomfile specified, it's contents overwrite variable settings in fms.input

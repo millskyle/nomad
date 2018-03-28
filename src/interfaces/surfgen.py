@@ -7,7 +7,7 @@ import os
 import shutil
 import pathlib
 import numpy as np
-import scr.fmsio.fileio as fileio
+import src.fmsio.fileio as fileio
 from ctypes import *
 
 
@@ -65,10 +65,10 @@ def init_interface():
     
     # Check that $SURFGEN is set and load library, then check for input files.
     sgen_path = os.environ['SURFGEN']
-    if not os.path.isfile(sgen_path+'/lib/libsurfgen.so'):
-        print("Surfgen library not found in: "+sgen_path+'/lib')
+    if not os.path.isfile(sgen_path+'/libsurfgen.so'):
+        print("Surfgen library not found in: "+sgen_path)
         sys.exit()
-    libsurf = cdll.LoadLibrary(sgen_path+'/lib/libsurfgen.so')
+    libsurf = cdll.LoadLibrary(sgen_path+'/libsurfgen.so')
 
     err = check_surfgen_input('./input')
     if err != 0:
