@@ -5,11 +5,13 @@
 import sys
 import os
 import shutil
+import copy
 import pathlib
 import numpy as np
+import src.fmsio.glbl as glbl
 import src.fmsio.fileio as fileio
+import src.basis.trajectory as trajectory
 from ctypes import *
-
 
 # number of atoms
 n_atoms = 0
@@ -17,7 +19,10 @@ n_atoms = 0
 n_states = 0
 # surfgen library
 libsurf = None
-# cache of derivative value
+# KE operator coefficients a_i:
+# T = sum_i a_i p_i^2,
+# where p_i is the momentum operator
+kecoeff = None
 
 class Surface:
     """Object containing potential energy surface data."""
@@ -60,9 +65,12 @@ class Surface:
 # init_interface: intialize surfgen and set up for evaluation
 #
 def init_interface():
-    global libsurf
+    global libsurf, kecoeff
     err = 0
-    
+
+    # set coefficient for kinetic energy determination
+    kecoeff = 1./(2. * np.array(glbl.nuclear_basis['masses'], dtype=float))
+
     # Check that $SURFGEN is set and load library, then check for input files.
     sgen_path = os.environ['SURFGEN']
     if not os.path.isfile(sgen_path+'/libsurfgen.so'):
@@ -82,36 +90,40 @@ def init_interface():
 # information for a single trajectory
 #
 def evaluate_trajectory(traj, t=None):
-    global n_atoms, n_states
+    global libsurf, n_atoms, n_states
 
     na = c_longlong(n_atoms)
     ns = c_longlong(n_states)
 
-    na3 = 3 * na
-    ns2 = ns * ns
+    na3 = 3 * n_atoms
+    ns2 = n_states * n_states
 
     # convert to c_types for interfacing with surfgen shared
     # library.
-    cgeom = traj.x()
-    energy = [0.0] * ns
-    agrads = [0.0] * (ns2 * na3)
-    hmat = [0.0] * ns2
-    dgrads = [0.0] * (ns2 * na3)
+    cgeom  = traj.x()
+    energy = [0.0 for i in range(n_states)]
+    cgrads = [0.0 for i in range(ns2*na3)]
+    hmat   = [0.0 for i in range(ns2)]
+    dgrads = [0.0 for i in range(ns2*na3)]
 
     cgeom = (c_double * na3)(*cgeom)
-    energy= (c_double * nstates)(*energy)
-    agrads= (c_double * (ns2 * na3)) (*cgrads)
+    energy= (c_double * n_states)(*energy)
+    cgrads= (c_double * (ns2 * na3)) (*cgrads)
     hmat  = (c_double * ns2) (*hmat)
     dgrads= (c_double * (ns2 * na3)) (*dgrads)
 
-    lib.evaluatesurfgen77_(byref(na), byref(ns), cgeom,
-                           energy, agrads, hmat, dgrads)
+    libsurf.evaluatesurfgen77_(byref(na), byref(ns), cgeom,
+                               energy, cgrads, hmat, dgrads)
 
+    cartgrd = np.array(np.reshape(cgrads,(na3,n_states,n_states)))
     surf_info = Surface(traj.label, n_states, 3*n_atoms)
     surf_info.geom      = traj.x()
+    surf_info.potential = np.array([energy[i] for i in range(n_states)], dtype=float)
     surf_info.potential = energy
-    surf_info.deriv     = set_phase(traj, cgrads)
-    surf_info.coupling  = surf_info.deriv - np.diag(np.diag(surf_info.deriv))
+    surf_info.deriv     = set_phase(traj, cartgrd)
+    surf_info.coupling  = surf_info.deriv
+    for i in range(n_states):
+        surf_info.coupling[:,i,i] = np.array([0. for j in range(na3)],dtype=float)
 
     return surf_info
 
@@ -136,9 +148,11 @@ def evalutate_centroid(cent, t=None):
 def initialize_surfgen_potential():
     global libsurf, n_atoms, n_states
     print("\n --- INITIALIZING SURFGEN SURFACE --- \n")
+    os.chdir('./input')
     libsurf.initpotential_()
     n_atoms = c_longlong.in_dll(libsurf,'__progdata_MOD_natoms').value
     n_states= c_longlong.in_dll(libsurf,'__hddata_MOD_nstates').value
+    os.chdir('../')
 
 #
 # check_surfgen_input: check for all files necessary for successful
@@ -152,7 +166,7 @@ def check_surfgen_input(path):
     #  hd.data, surfgen.in, coord.in, refgeom, irrep.in,
     #  error.log
     files = [path+'/hd.data', path+'/surfgen.in', path+'/coord.in',\
-             path+'/refgeom', path+'/irrep.in', path+'/error.log']
+             path+'/refgeom', path+'/irrep.in']
     for i in range(len(files)):
         err = check_file_exists(files[i])
         if err != 0:
@@ -192,7 +206,7 @@ def set_phase(traj, new_coup):
     for i in range(n_states):
         for j in range(i):
             # if the previous coupling is vanishing, phase of new coupling is arbitrary
-            if np.linalg.norm(old_coup[:,i,j]) > glbl.fpzero:
+            if np.linalg.norm(old_coup[:,i,j]) > glbl.constants['fpzero']:
                 # check the difference between the vectors assuming phases of +1/-1
                 norm_pos = np.linalg.norm( new_coup[:,i,j] - old_coup[:,i,j])
                 norm_neg = np.linalg.norm(-new_coup[:,i,j] - old_coup[:,i,j])
